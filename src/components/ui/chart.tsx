@@ -61,30 +61,33 @@ ChartContainer.displayName = "Chart";
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(([_, config]) => config.theme || config.color);
 
-  if (!colorConfig.length) {
-    return null;
-  }
+  React.useEffect(() => {
+    if (!colorConfig.length) return;
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
-      }}
-    />
-  );
+    const chartEl = document.querySelector(`[data-chart=${CSS.escape(id)}]`) as HTMLElement | null;
+    if (!chartEl) return;
+
+    // Set CSS variables for light theme directly on the element
+    colorConfig.forEach(([key, itemConfig]) => {
+      const color = itemConfig.theme?.light || itemConfig.color;
+      if (color) {
+        chartEl.style.setProperty(`--color-${key}`, color);
+      }
+    });
+
+    // For dark theme, add a MutationObserver or check current theme
+    const isDark = document.documentElement.classList.contains("dark");
+    if (isDark) {
+      colorConfig.forEach(([key, itemConfig]) => {
+        const color = itemConfig.theme?.dark || itemConfig.color;
+        if (color) {
+          chartEl.style.setProperty(`--color-${key}`, color);
+        }
+      });
+    }
+  }, [id, colorConfig]);
+
+  return null;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
