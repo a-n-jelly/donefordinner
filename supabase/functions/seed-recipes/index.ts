@@ -141,6 +141,20 @@ Deno.serve(async (req) => {
       try {
         const recipe = await scrapeRecipe(url.trim(), apiKey);
         
+        // Check if recipe already exists
+        const { data: existing } = await supabase
+          .from('recipes')
+          .select('id')
+          .eq('title', recipe.title)
+          .is('user_id', null)
+          .maybeSingle();
+        
+        if (existing) {
+          results.push({ url, success: true, title: recipe.title, skipped: true });
+          console.log('Skipped (exists):', recipe.title);
+          continue;
+        }
+        
         const { error: insertError } = await supabase.from('recipes').insert(recipe);
         
         if (insertError) {
