@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { UtensilsCrossed, Heart, ShoppingCart, LogIn, LogOut, User } from 'lucide-react';
+import { UtensilsCrossed, Heart, ShoppingCart, LogIn, LogOut, User, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -16,7 +16,7 @@ const Navbar = () => {
 
   const links = [
     { to: '/', label: 'Recipes', icon: UtensilsCrossed },
-    { to: '/add-recipe', label: 'Add Recipe', icon: UtensilsCrossed },
+    { to: '/my-recipes', label: 'My Recipes', icon: BookOpen },
     { to: '/favorites', label: 'Favorites', icon: Heart },
     { to: '/shopping-list', label: 'Shopping List', icon: ShoppingCart },
   ];

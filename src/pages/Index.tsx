@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { recipes } from '@/data/recipes';
+import { recipes as staticRecipes } from '@/data/recipes';
+import { useDbRecipes } from '@/hooks/useDbRecipes';
 import RecipeCard from '@/components/RecipeCard';
 import SearchAndFilter from '@/components/SearchAndFilter';
 import AddRecipeDialog from '@/components/AddRecipeDialog';
@@ -9,6 +10,7 @@ import heroBanner from '@/assets/hero-banner.jpg';
 
 const Index = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { dbRecipes, refetch } = useDbRecipes();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<MealType | ''>('');
   const [selectedCuisine, setSelectedCuisine] = useState<CuisineType | ''>('');
@@ -16,8 +18,15 @@ const Index = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | ''>('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
+  // Merge static and DB recipes, deduplicating by title
+  const allRecipes = useMemo(() => {
+    const staticTitles = new Set(staticRecipes.map(r => r.title.toLowerCase()));
+    const uniqueDb = dbRecipes.filter(r => !staticTitles.has(r.title.toLowerCase()));
+    return [...staticRecipes, ...uniqueDb];
+  }, [dbRecipes]);
+
   const filteredRecipes = useMemo(() => {
-    return recipes.filter(r => {
+    return allRecipes.filter(r => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (!r.title.toLowerCase().includes(q) && !r.description.toLowerCase().includes(q) && !r.cuisine.toLowerCase().includes(q)) return false;
@@ -28,7 +37,7 @@ const Index = () => {
       if (selectedDifficulty && r.difficulty !== selectedDifficulty) return false;
       return true;
     });
-  }, [searchQuery, selectedCategory, selectedCuisine, selectedDietary, selectedDifficulty]);
+  }, [allRecipes, searchQuery, selectedCategory, selectedCuisine, selectedDietary, selectedDifficulty]);
 
   return (
     <div className="min-h-screen pb-20 md:pb-0">
@@ -76,7 +85,7 @@ const Index = () => {
         )}
       </div>
 
-      <AddRecipeDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+      <AddRecipeDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} onRecipeAdded={refetch} />
     </div>
   );
 };
