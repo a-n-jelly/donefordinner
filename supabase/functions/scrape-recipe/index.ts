@@ -133,9 +133,10 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: ['json'],
-        jsonOptions: {
-          schema: recipeSchema
+        formats: ['extract'],
+        extract: {
+          schema: recipeSchema,
+          prompt: 'Extract all recipe information from this page including title, description, ingredients with amounts and units, step-by-step instructions, nutritional values per serving, cooking times, difficulty level, cuisine type, categories, and dietary tags.'
         },
         onlyMainContent: true,
       }),
