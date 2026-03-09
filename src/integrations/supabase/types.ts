@@ -14,7 +14,164 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      favorites: {
+        Row: {
+          created_at: string
+          id: string
+          recipe_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          recipe_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          recipe_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          dietary_preferences: string[] | null
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          dietary_preferences?: string[] | null
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          dietary_preferences?: string[] | null
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      recipes: {
+        Row: {
+          author: string | null
+          category: string[] | null
+          cook_time: number | null
+          created_at: string
+          cuisine: string | null
+          description: string | null
+          difficulty: string | null
+          id: string
+          image_url: string | null
+          ingredients: Json | null
+          instructions: Json | null
+          nutrition: Json | null
+          prep_time: number | null
+          rating: number | null
+          review_count: number | null
+          servings: number | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          author?: string | null
+          category?: string[] | null
+          cook_time?: number | null
+          created_at?: string
+          cuisine?: string | null
+          description?: string | null
+          difficulty?: string | null
+          id?: string
+          image_url?: string | null
+          ingredients?: Json | null
+          instructions?: Json | null
+          nutrition?: Json | null
+          prep_time?: number | null
+          rating?: number | null
+          review_count?: number | null
+          servings?: number | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          author?: string | null
+          category?: string[] | null
+          cook_time?: number | null
+          created_at?: string
+          cuisine?: string | null
+          description?: string | null
+          difficulty?: string | null
+          id?: string
+          image_url?: string | null
+          ingredients?: Json | null
+          instructions?: Json | null
+          nutrition?: Json | null
+          prep_time?: number | null
+          rating?: number | null
+          review_count?: number | null
+          servings?: number | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      shopping_list_items: {
+        Row: {
+          amount: number | null
+          checked: boolean
+          created_at: string
+          id: string
+          item: string
+          recipe_title: string | null
+          unit: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          checked?: boolean
+          created_at?: string
+          id?: string
+          item: string
+          recipe_title?: string | null
+          unit?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          checked?: boolean
+          created_at?: string
+          id?: string
+          item?: string
+          recipe_title?: string | null
+          unit?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
