@@ -36,7 +36,7 @@ const RecipeDetail = () => {
 
   const scale = recipe ? servings / recipe.servings : 1;
 
-  if (loadingDb) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -49,7 +49,7 @@ const RecipeDetail = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="font-heading text-2xl mb-2">Recipe not found</h1>
-          <Link to="/" className="text-primary hover:underline">Back to recipes</Link>
+          <Link to="/" className="text-primary hover:underline">Back to cookbook</Link>
         </div>
       </div>
     );
