@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import RecipeDetail from "./pages/RecipeDetail";
 import FavoritesPage from "./pages/FavoritesPage";
 import ShoppingListPage from "./pages/ShoppingListPage";
+import AddRecipePage from "./pages/AddRecipePage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
