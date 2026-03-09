@@ -98,7 +98,7 @@ const MealPlanPage = () => {
     const recipeIds = [...new Set(meals.map(m => m.recipeId).filter(Boolean))] as string[];
     const { data: recipes } = await supabase
       .from('recipes')
-      .select('id, title, ingredients')
+      .select('id, title, ingredients, servings')
       .in('id', recipeIds);
 
     if (!recipes || recipes.length === 0) {
@@ -111,20 +111,27 @@ const MealPlanPage = () => {
 
     for (const meal of meals) {
       const recipe = recipes.find(r => r.id === meal.recipeId);
-      if (!recipe || !Array.isArray(recipe.ingredients)) continue;
+      if (!recipe) continue;
+      
+      const ingredients = recipe.ingredients as Array<{ name?: string; item?: string; amount?: string | number; unit?: string }> | null;
+      if (!Array.isArray(ingredients)) continue;
 
-      const scale = meal.servings / 4; // Assume recipes are for 4 servings by default
-      for (const ing of recipe.ingredients) {
-        const key = `${ing.name || ing.item}-${ing.unit || ''}`.toLowerCase();
+      const recipeServings = recipe.servings || 4;
+      const scale = meal.servings / recipeServings;
+
+      for (const ing of ingredients) {
+        const itemName = ing.name || ing.item || '';
+        const unit = ing.unit || '';
+        const key = `${itemName}-${unit}`.toLowerCase();
         const existing = ingredientMap.get(key);
-        const amount = (parseFloat(ing.amount) || 0) * scale;
+        const amount = (parseFloat(String(ing.amount)) || 0) * scale;
 
         if (existing) {
           existing.amount += amount;
         } else {
           ingredientMap.set(key, {
             amount,
-            unit: ing.unit || '',
+            unit,
             recipeTitle: recipe.title,
           });
         }
