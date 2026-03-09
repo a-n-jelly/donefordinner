@@ -1,76 +1,114 @@
 
 
-# Authentication with Social Login and Magic Link
+# Database Setup with Lovable Cloud
 
 ## Overview
-Add authentication to the Savory app using Lovable Cloud (Supabase Auth). Users can sign in via Google, Apple, or email magic link. The database schema from the existing plan already includes a `profiles` table with an auto-creation trigger -- this plan builds on that foundation.
+Set up a Supabase-backed database via Lovable Cloud to store recipes, user profiles, favorites, and shopping list items. This replaces the current localStorage-based persistence and the hardcoded recipe data file, laying the groundwork for authentication in the next step.
 
-## Prerequisites
-Lovable Cloud must be enabled first (as outlined in the existing database plan). The database migration should create the `profiles` table and auto-profile trigger before auth is wired up. If Cloud is not yet enabled, we will enable it as the first step.
+## Database Schema
 
-## Auth Methods
-1. **Google OAuth** -- Social sign-in via Google
-2. **Apple OAuth** -- Social sign-in via Apple ID
-3. **Email Magic Link** -- Passwordless login; user receives a clickable link via email
+### 1. `recipes` table
+Stores all recipe data. Publicly readable by anyone.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID (PK) | Auto-generated |
+| user_id | UUID (FK auth.users) | Nullable for seed data |
+| title | TEXT | Not null |
+| description | TEXT | |
+| image_url | TEXT | |
+| servings | INT | |
+| prep_time | INT | Minutes |
+| cook_time | INT | Minutes |
+| difficulty | TEXT | Easy/Medium/Hard |
+| category | TEXT[] | Array of meal types |
+| cuisine | TEXT | |
+| tags | TEXT[] | Dietary tags |
+| ingredients | JSONB | Array of {item, amount, unit} |
+| instructions | JSONB | Array of {stepNumber, instruction, timerMinutes?} |
+| nutrition | JSONB | {calories, protein, carbs, fat} |
+| rating | FLOAT | |
+| review_count | INT | |
+| author | TEXT | |
+| created_at | TIMESTAMPTZ | Default now() |
+
+### 2. `profiles` table
+Created automatically when a user signs up (via trigger).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID (PK) | Same as auth.users.id |
+| display_name | TEXT | |
+| avatar_url | TEXT | |
+| dietary_preferences | TEXT[] | |
+| created_at | TIMESTAMPTZ | Default now() |
+
+### 3. `favorites` table
+Links users to their favorite recipes.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID (PK) | Auto-generated |
+| user_id | UUID (FK auth.users) | Not null |
+| recipe_id | UUID (FK recipes) | Not null |
+| created_at | TIMESTAMPTZ | Default now() |
+| | | Unique(user_id, recipe_id) |
+
+### 4. `shopping_list_items` table
+Persists user shopping list items.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | UUID (PK) | Auto-generated |
+| user_id | UUID (FK auth.users) | Not null |
+| item | TEXT | Not null |
+| amount | FLOAT | |
+| unit | TEXT | |
+| checked | BOOLEAN | Default false |
+| recipe_title | TEXT | Optional reference |
+| created_at | TIMESTAMPTZ | Default now() |
+
+## Security (RLS Policies)
+
+- **recipes**: SELECT open to all; INSERT/UPDATE/DELETE for authenticated owner only
+- **profiles**: SELECT for authenticated users; INSERT via trigger; UPDATE/DELETE own row only
+- **favorites**: All operations restricted to own user_id
+- **shopping_list_items**: All operations restricted to own user_id
+
+## Auto-profile trigger
+A database trigger will automatically create a profile row when a new user signs up.
 
 ## Implementation Steps
 
 ### Step 1: Enable Lovable Cloud
-Connect the project to Lovable Cloud to get a Supabase backend with Auth capabilities.
+Connect the project to Lovable Cloud to get a Supabase backend.
 
-### Step 2: Run database migration
-Execute the migration from the existing plan (profiles, recipes, favorites, shopping_list_items tables, RLS policies, auto-profile trigger). This is a prerequisite for auth since the profiles table must exist.
+### Step 2: Create database migration
+Single migration with:
+1. Create `profiles` table with FK to `auth.users(id)` and ON DELETE CASCADE
+2. Create `recipes` table (user_id nullable to allow seed data)
+3. Create `favorites` table with unique constraint
+4. Create `shopping_list_items` table
+5. Enable RLS on all tables
+6. Create helper functions (`is_recipe_owner`, etc.) as SECURITY DEFINER
+7. Create RLS policies for each table
+8. Create trigger to auto-create profile on signup
 
-### Step 3: Enable OAuth providers
-Configure Google and Apple as auth providers in the Supabase project. This involves:
-- Enabling Google provider (requires Google OAuth client ID and secret from Google Cloud Console)
-- Enabling Apple provider (requires Apple Services ID, team ID, key ID, and private key from Apple Developer Console)
-- Setting the correct redirect URLs
+### Step 3: Seed recipe data
+Insert the existing 12 recipes from `src/data/recipes.ts` into the database using the data insert tool.
 
-### Step 4: Create Auth UI pages
-- **`src/pages/AuthPage.tsx`** -- Login/signup page with three options:
-  - "Continue with Google" button
-  - "Continue with Apple" button
-  - Email input + "Send Magic Link" button
-- Clean, branded UI matching the Savory design system (sage green, terracotta, Playfair Display headings)
+### Step 4: Update frontend code
+- Install and configure `@supabase/supabase-js`
+- Create `src/integrations/supabase/client.ts` for the Supabase client
+- Create `src/hooks/useRecipes.ts` -- fetch recipes from Supabase using TanStack Query
+- Update `useFavorites.ts` -- read/write favorites from Supabase (with localStorage fallback for unauthenticated users)
+- Update `useShoppingList.ts` -- read/write shopping items from Supabase (with localStorage fallback)
+- Update `Index.tsx`, `RecipeDetail.tsx`, `FavoritesPage.tsx`, `ShoppingListPage.tsx` to use the new Supabase-backed hooks
+- Keep the static `recipes.ts` data file as a fallback/reference but primary source becomes the database
 
-### Step 5: Create Auth context and hook
-- **`src/contexts/AuthContext.tsx`** -- React context providing:
-  - `user` (current Supabase user or null)
-  - `session` (current session)
-  - `signOut()` function
-  - `loading` state
-- Uses `onAuthStateChange` listener (set up BEFORE `getSession()` per best practices)
-- Wrap the app in `<AuthProvider>`
+### Step 5: Generate TypeScript types
+Auto-generate types from the Supabase schema to ensure type safety across the app.
 
-### Step 6: Create protected route wrapper
-- **`src/components/ProtectedRoute.tsx`** -- Redirects unauthenticated users to `/auth` for protected pages (favorites, shopping list)
-- Recipe browsing and detail pages remain public
-
-### Step 7: Update Navbar
-- Show user avatar/name when logged in, with a dropdown for sign-out
-- Show "Sign In" button when logged out
-- Highlight which features require login
-
-### Step 8: Update existing hooks
-- `useFavorites` and `useShoppingList` -- check auth state; if logged in, sync with Supabase; if not, continue using localStorage as fallback
-
-### Step 9: Add `/auth` route to App.tsx
-- Add the auth page route
-- Wrap favorites and shopping list routes in `<ProtectedRoute>`
-
-## Route Protection Summary
-| Route | Access |
-|-------|--------|
-| `/` | Public |
-| `/recipe/:id` | Public |
-| `/auth` | Public (redirects to `/` if already logged in) |
-| `/favorites` | Authenticated only |
-| `/shopping-list` | Authenticated only |
-
-## Technical Notes
-- Magic link emails use Supabase's built-in email handling (no custom templates needed initially)
-- `emailRedirectTo` will be set to `window.location.origin` for magic links
-- Social login callbacks will redirect back to the app origin
-- Google and Apple OAuth require external developer console setup -- credentials will be stored as Supabase secrets
+## What comes next (not in this plan)
+Authentication (login/signup pages, auth context, protected routes) will be the next step after the database is confirmed working.
 
