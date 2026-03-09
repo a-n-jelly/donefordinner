@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { UtensilsCrossed, Heart, ShoppingCart, LogIn, LogOut, User, BookOpen } from 'lucide-react';
+import { UtensilsCrossed, Heart, ShoppingCart, LogIn, LogOut, User, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -15,10 +15,10 @@ const Navbar = () => {
   const { user, signOut } = useAuth();
 
   const links = [
-    { to: '/', label: 'Recipes', icon: UtensilsCrossed },
-    { to: '/my-recipes', label: 'My Recipes', icon: BookOpen },
+    { to: '/', label: 'Cookbook', icon: UtensilsCrossed },
+    { to: '/meal-plan', label: 'Meal Plan', icon: CalendarDays },
     { to: '/favorites', label: 'Favorites', icon: Heart },
-    { to: '/shopping-list', label: 'Shopping List', icon: ShoppingCart },
+    { to: '/shopping-list', label: 'Shopping', icon: ShoppingCart },
   ];
 
   const initials = user?.user_metadata?.full_name

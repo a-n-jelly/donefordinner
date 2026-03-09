@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { recipes as staticRecipes } from '@/data/recipes';
 import { mapDbRecipe } from '@/hooks/useDbRecipes';
 import { supabase } from '@/integrations/supabase/client';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -12,34 +11,32 @@ import { toast } from 'sonner';
 
 const RecipeDetail = () => {
   const { id } = useParams();
-  const staticRecipe = staticRecipes.find(r => r.id === id);
-  const [dbRecipe, setDbRecipe] = useState<Recipe | null>(null);
-  const [loadingDb, setLoadingDb] = useState(!staticRecipe);
+  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [loading, setLoading] = useState(true);
   const { isFavorite, toggleFavorite } = useFavorites();
   const { addFromRecipe } = useShoppingList();
 
-  const recipe = staticRecipe || dbRecipe;
-  const [servings, setServings] = useState(recipe?.servings || 1);
+  const [servings, setServings] = useState(4);
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [showCookingMode, setShowCookingMode] = useState(false);
 
-  // Fetch from DB if not found in static recipes
+  // Fetch recipe from DB
   useEffect(() => {
-    if (staticRecipe || !id) return;
-    setLoadingDb(true);
+    if (!id) return;
+    setLoading(true);
     supabase.from('recipes').select('*').eq('id', id).maybeSingle().then(({ data }) => {
       if (data) {
         const mapped = mapDbRecipe(data);
-        setDbRecipe(mapped);
+        setRecipe(mapped);
         setServings(mapped.servings);
       }
-      setLoadingDb(false);
+      setLoading(false);
     });
-  }, [id, staticRecipe]);
+  }, [id]);
 
   const scale = recipe ? servings / recipe.servings : 1;
 
-  if (loadingDb) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -52,7 +49,7 @@ const RecipeDetail = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="font-heading text-2xl mb-2">Recipe not found</h1>
-          <Link to="/" className="text-primary hover:underline">Back to recipes</Link>
+          <Link to="/" className="text-primary hover:underline">Back to cookbook</Link>
         </div>
       </div>
     );

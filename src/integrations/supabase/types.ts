@@ -43,6 +43,91 @@ export type Database = {
           },
         ]
       }
+      meal_plan_items: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          id: string
+          is_leftover: boolean
+          leftover_source_id: string | null
+          meal_label: string
+          meal_plan_id: string
+          notes: string | null
+          recipe_id: string | null
+          servings: number | null
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          id?: string
+          is_leftover?: boolean
+          leftover_source_id?: string | null
+          meal_label?: string
+          meal_plan_id: string
+          notes?: string | null
+          recipe_id?: string | null
+          servings?: number | null
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          is_leftover?: boolean
+          leftover_source_id?: string | null
+          meal_label?: string
+          meal_plan_id?: string
+          notes?: string | null
+          recipe_id?: string | null
+          servings?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_items_leftover_source_id_fkey"
+            columns: ["leftover_source_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_items_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_plans: {
+        Row: {
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          week_start_date: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          week_start_date: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
