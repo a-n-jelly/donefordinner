@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import RecipeDetail from "./pages/RecipeDetail";
 import FavoritesPage from "./pages/FavoritesPage";
 import ShoppingListPage from "./pages/ShoppingListPage";
+import AddRecipePage from "./pages/AddRecipePage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/recipe/:id" element={<ProtectedRoute><RecipeDetail /></ProtectedRoute>} />
+            <Route path="/add-recipe" element={<ProtectedRoute><AddRecipePage /></ProtectedRoute>} />
             <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
             <Route path="/shopping-list" element={<ProtectedRoute><ShoppingListPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

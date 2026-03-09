@@ -16,6 +16,7 @@ const Navbar = () => {
 
   const links = [
     { to: '/', label: 'Recipes', icon: UtensilsCrossed },
+    { to: '/add-recipe', label: 'Add Recipe', icon: UtensilsCrossed },
     { to: '/favorites', label: 'Favorites', icon: Heart },
     { to: '/shopping-list', label: 'Shopping List', icon: ShoppingCart },
   ];
