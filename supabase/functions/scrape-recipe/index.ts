@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
     }
 
     // Extract recipe data from Firecrawl response
-    const recipeData = data.data?.json || data.json;
+    const recipeData = data.data?.extract || data.extract;
     
     if (!recipeData || !recipeData.title) {
       return new Response(
