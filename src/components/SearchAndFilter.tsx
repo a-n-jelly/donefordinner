@@ -1,5 +1,6 @@
-import { Search, X } from 'lucide-react';
+import { Search, X, Plus } from 'lucide-react';
 import { MealType, CuisineType, DietaryTag, Difficulty } from '@/types/recipe';
+import { Button } from '@/components/ui/button';
 
 interface SearchAndFilterProps {
   searchQuery: string;
@@ -12,6 +13,7 @@ interface SearchAndFilterProps {
   onDietaryChange: (d: DietaryTag | '') => void;
   selectedDifficulty: Difficulty | '';
   onDifficultyChange: (d: Difficulty | '') => void;
+  onAddRecipe?: () => void;
 }
 
 const categories: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack'];
@@ -38,25 +40,34 @@ const SearchAndFilter = ({
   selectedCuisine, onCuisineChange,
   selectedDietary, onDietaryChange,
   selectedDifficulty, onDifficultyChange,
+  onAddRecipe,
 }: SearchAndFilterProps) => {
   const hasFilters = selectedCategory || selectedCuisine || selectedDietary || selectedDifficulty;
 
   return (
     <div className="space-y-4">
-      {/* Search bar */}
-      <div className="relative max-w-md mx-auto">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search recipes..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-10 pr-10 py-2.5 rounded-full bg-muted/60 border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-        />
-        {searchQuery && (
-          <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
+      {/* Search bar + Add button */}
+      <div className="flex items-center gap-3 max-w-xl mx-auto">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search recipes..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 rounded-full bg-muted/60 border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+          />
+          {searchQuery && (
+            <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+        {onAddRecipe && (
+          <Button size="sm" onClick={onAddRecipe} className="shrink-0">
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
         )}
       </div>
 
