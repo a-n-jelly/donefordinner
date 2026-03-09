@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { recipes } from '@/data/recipes';
 import RecipeCard from '@/components/RecipeCard';
 import SearchAndFilter from '@/components/SearchAndFilter';
+import AddRecipeDialog from '@/components/AddRecipeDialog';
 import { useFavorites } from '@/hooks/useFavorites';
 import { MealType, CuisineType, DietaryTag, Difficulty } from '@/types/recipe';
 import heroBanner from '@/assets/hero-banner.jpg';
@@ -13,6 +14,7 @@ const Index = () => {
   const [selectedCuisine, setSelectedCuisine] = useState<CuisineType | ''>('');
   const [selectedDietary, setSelectedDietary] = useState<DietaryTag | ''>('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | ''>('');
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const filteredRecipes = useMemo(() => {
     return recipes.filter(r => {
@@ -52,6 +54,7 @@ const Index = () => {
           selectedCuisine={selectedCuisine} onCuisineChange={setSelectedCuisine}
           selectedDietary={selectedDietary} onDietaryChange={setSelectedDietary}
           selectedDifficulty={selectedDifficulty} onDifficultyChange={setSelectedDifficulty}
+          onAddRecipe={() => setAddDialogOpen(true)}
         />
 
         {/* Recipe Grid */}
@@ -72,6 +75,8 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      <AddRecipeDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
   );
 };
