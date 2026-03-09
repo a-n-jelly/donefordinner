@@ -133,10 +133,10 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: [{ 
-          type: 'json',
+        formats: ['json'],
+        jsonOptions: {
           schema: recipeSchema
-        }],
+        },
         onlyMainContent: true,
       }),
     });
