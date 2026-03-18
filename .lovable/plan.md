@@ -1,114 +1,62 @@
 
 
-# Database Setup with Lovable Cloud
+## Plan: Auth-Aware Routing with Landing Page
 
-## Overview
-Set up a Supabase-backed database via Lovable Cloud to store recipes, user profiles, favorites, and shopping list items. This replaces the current localStorage-based persistence and the hardcoded recipe data file, laying the groundwork for authentication in the next step.
+### Estimated Effort: ~4-5 messages
 
-## Database Schema
+Here's a breakdown by message:
 
-### 1. `recipes` table
-Stores all recipe data. Publicly readable by anyone.
+---
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID (PK) | Auto-generated |
-| user_id | UUID (FK auth.users) | Nullable for seed data |
-| title | TEXT | Not null |
-| description | TEXT | |
-| image_url | TEXT | |
-| servings | INT | |
-| prep_time | INT | Minutes |
-| cook_time | INT | Minutes |
-| difficulty | TEXT | Easy/Medium/Hard |
-| category | TEXT[] | Array of meal types |
-| cuisine | TEXT | |
-| tags | TEXT[] | Dietary tags |
-| ingredients | JSONB | Array of {item, amount, unit} |
-| instructions | JSONB | Array of {stepNumber, instruction, timerMinutes?} |
-| nutrition | JSONB | {calories, protein, carbs, fat} |
-| rating | FLOAT | |
-| review_count | INT | |
-| author | TEXT | |
-| created_at | TIMESTAMPTZ | Default now() |
+### Message 1: Create Landing Page (~1 credit)
+Create `src/pages/LandingPage.tsx` — a public marketing page with:
+- Hero section: headline, subheadline explaining "digital cookbook, meal planner, and shopping list"
+- Benefits section (3-4 feature cards)
+- Dual CTA: "Sign In" button (links to `/auth`) + "Join the Waitlist" button (captures email to a new `waitlist` table)
+- Clean, on-brand design using existing Tailwind theme
 
-### 2. `profiles` table
-Created automatically when a user signs up (via trigger).
+### Message 2: Database + Waitlist (~1 credit)
+- Create `waitlist` table (id, email, created_at) with migration
+- No RLS needed (or simple insert-only policy for anon)
+- Wire up the waitlist form on the landing page to insert into this table
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID (PK) | Same as auth.users.id |
-| display_name | TEXT | |
-| avatar_url | TEXT | |
-| dietary_preferences | TEXT[] | |
-| created_at | TIMESTAMPTZ | Default now() |
+### Message 3: Routing Overhaul (~1 credit)
+- Update `App.tsx`: mount `LandingPage` at `/`, move cookbook to `/cookbook`
+- Update `ProtectedRoute.tsx`: remove the preview bypass, redirect unauthenticated users to `/` (landing) instead of `/auth`
+- Update `AuthPage.tsx`: after successful login, redirect to `/cookbook`
+- Update all internal `<Link to="/">` references to `/cookbook`
 
-### 3. `favorites` table
-Links users to their favorite recipes.
+### Message 4: Navigation State (~1 credit)
+- Update `Navbar.tsx`: only render for authenticated users (hide on landing page)
+- Navbar already shows Sign In / Sign Out based on auth state — just ensure "Sign Out" redirects to `/`
+- Landing page gets its own minimal top nav (logo + "Sign In" button)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID (PK) | Auto-generated |
-| user_id | UUID (FK auth.users) | Not null |
-| recipe_id | UUID (FK recipes) | Not null |
-| created_at | TIMESTAMPTZ | Default now() |
-| | | Unique(user_id, recipe_id) |
+### Message 5: Polish & Edge Cases (~1 credit)
+- Session persistence verification (already handled by Supabase)
+- Ensure refresh on protected routes redirects to landing if session expired
+- Loading spinner during auth state resolution
 
-### 4. `shopping_list_items` table
-Persists user shopping list items.
+---
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | UUID (PK) | Auto-generated |
-| user_id | UUID (FK auth.users) | Not null |
-| item | TEXT | Not null |
-| amount | FLOAT | |
-| unit | TEXT | |
-| checked | BOOLEAN | Default false |
-| recipe_title | TEXT | Optional reference |
-| created_at | TIMESTAMPTZ | Default now() |
+### Summary of File Changes
 
-## Security (RLS Policies)
+| File | Action |
+|------|--------|
+| `src/pages/LandingPage.tsx` | **Create** — marketing landing page |
+| `src/App.tsx` | **Edit** — new route structure |
+| `src/components/ProtectedRoute.tsx` | **Edit** — remove preview bypass, redirect to `/` |
+| `src/components/Navbar.tsx` | **Edit** — hide on landing, conditional rendering |
+| `src/pages/AuthPage.tsx` | **Edit** — redirect to `/cookbook` after login |
+| `src/components/Navbar.tsx` | **Edit** — update internal links from `/` to `/cookbook` |
+| Migration SQL | **Create** — `waitlist` table |
 
-- **recipes**: SELECT open to all; INSERT/UPDATE/DELETE for authenticated owner only
-- **profiles**: SELECT for authenticated users; INSERT via trigger; UPDATE/DELETE own row only
-- **favorites**: All operations restricted to own user_id
-- **shopping_list_items**: All operations restricted to own user_id
+### Recommended Approach
 
-## Auto-profile trigger
-A database trigger will automatically create a profile row when a new user signs up.
+Send this as **2-3 prompts** to Lovable rather than all at once:
 
-## Implementation Steps
+1. **First prompt**: "Create a landing page at `/` with hero, benefits, and dual CTA (Sign In + Join Waitlist). Move the cookbook to `/cookbook`. Update ProtectedRoute to redirect unauthenticated users to the landing page instead of `/auth`. Remove the preview/dev auth bypass."
 
-### Step 1: Enable Lovable Cloud
-Connect the project to Lovable Cloud to get a Supabase backend.
+2. **Second prompt**: "Create a waitlist table in the database and wire the Join Waitlist button to save emails. Update the navbar to hide on the landing page and show a minimal header instead."
 
-### Step 2: Create database migration
-Single migration with:
-1. Create `profiles` table with FK to `auth.users(id)` and ON DELETE CASCADE
-2. Create `recipes` table (user_id nullable to allow seed data)
-3. Create `favorites` table with unique constraint
-4. Create `shopping_list_items` table
-5. Enable RLS on all tables
-6. Create helper functions (`is_recipe_owner`, etc.) as SECURITY DEFINER
-7. Create RLS policies for each table
-8. Create trigger to auto-create profile on signup
-
-### Step 3: Seed recipe data
-Insert the existing 12 recipes from `src/data/recipes.ts` into the database using the data insert tool.
-
-### Step 4: Update frontend code
-- Install and configure `@supabase/supabase-js`
-- Create `src/integrations/supabase/client.ts` for the Supabase client
-- Create `src/hooks/useRecipes.ts` -- fetch recipes from Supabase using TanStack Query
-- Update `useFavorites.ts` -- read/write favorites from Supabase (with localStorage fallback for unauthenticated users)
-- Update `useShoppingList.ts` -- read/write shopping items from Supabase (with localStorage fallback)
-- Update `Index.tsx`, `RecipeDetail.tsx`, `FavoritesPage.tsx`, `ShoppingListPage.tsx` to use the new Supabase-backed hooks
-- Keep the static `recipes.ts` data file as a fallback/reference but primary source becomes the database
-
-### Step 5: Generate TypeScript types
-Auto-generate types from the Supabase schema to ensure type safety across the app.
-
-## What comes next (not in this plan)
-Authentication (login/signup pages, auth context, protected routes) will be the next step after the database is confirmed working.
+3. **Third prompt**: "Test and polish — ensure session persistence, logout redirects to landing, and all internal links point to `/cookbook`."
 
