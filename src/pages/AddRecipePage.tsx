@@ -65,7 +65,7 @@ const AddRecipePage = () => {
       if (error) throw error;
 
       toast.success('Recipe added to your cookbook!');
-      navigate('/');
+      navigate('/cookbook');
     } catch (error: any) {
       toast.error(error.message || 'Failed to save recipe');
     } finally {

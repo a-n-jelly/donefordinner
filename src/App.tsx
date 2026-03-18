@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Navbar from "./components/Navbar";
+import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import RecipeDetail from "./pages/RecipeDetail";
 import FavoritesPage from "./pages/FavoritesPage";
@@ -23,14 +24,17 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Navbar />
           <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/recipe/:id" element={<ProtectedRoute><RecipeDetail /></ProtectedRoute>} />
-            <Route path="/meal-plan" element={<ProtectedRoute><MealPlanPage /></ProtectedRoute>} />
-            <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
-            <Route path="/shopping-list" element={<ProtectedRoute><ShoppingListPage /></ProtectedRoute>} />
+
+            {/* Protected routes with Navbar */}
+            <Route path="/cookbook" element={<ProtectedRoute><><Navbar /><Index /></></ProtectedRoute>} />
+            <Route path="/recipe/:id" element={<ProtectedRoute><><Navbar /><RecipeDetail /></></ProtectedRoute>} />
+            <Route path="/meal-plan" element={<ProtectedRoute><><Navbar /><MealPlanPage /></></ProtectedRoute>} />
+            <Route path="/favorites" element={<ProtectedRoute><><Navbar /><FavoritesPage /></></ProtectedRoute>} />
+            <Route path="/shopping-list" element={<ProtectedRoute><><Navbar /><ShoppingListPage /></></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

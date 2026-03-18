@@ -39,7 +39,7 @@ const FavoritesPage = () => {
           <div className="text-center py-20">
             <Heart className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-lg text-muted-foreground mb-2">No favorites yet</p>
-            <Link to="/" className="text-primary hover:underline text-sm">Browse your cookbook to add some</Link>
+            <Link to="/cookbook" className="text-primary hover:underline text-sm">Browse your cookbook to add some</Link>
           </div>
         )}
       </div>

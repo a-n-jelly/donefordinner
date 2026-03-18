@@ -22,7 +22,7 @@ const AuthPage = () => {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/cookbook" replace />;
   }
 
   const handleMagicLink = async (e: React.FormEvent) => {
