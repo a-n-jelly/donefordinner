@@ -34,7 +34,7 @@ const ShoppingListPage = () => {
           <div className="text-center py-20">
             <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
             <p className="text-lg text-muted-foreground mb-2">Your shopping list is empty</p>
-            <Link to="/" className="text-primary hover:underline text-sm">Browse recipes to add ingredients</Link>
+            <Link to="/cookbook" className="text-primary hover:underline text-sm">Browse recipes to add ingredients</Link>
           </div>
         ) : (
           <div className="space-y-6">

@@ -81,7 +81,7 @@ const RecipeDetail = () => {
         <div className="relative h-[40vh] md:h-[50vh]">
           <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
-          <Link to="/" className="absolute top-4 left-4 p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors">
+          <Link to="/cookbook" className="absolute top-4 left-4 p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors">
             <ArrowLeft className="h-5 w-5 text-foreground" />
           </Link>
           <button
