@@ -49,7 +49,7 @@ const RecipeDetail = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="font-heading text-2xl mb-2">Recipe not found</h1>
-          <Link to="/" className="text-primary hover:underline">Back to cookbook</Link>
+          <Link to="/cookbook" className="text-primary hover:underline">Back to cookbook</Link>
         </div>
       </div>
     );
