@@ -15,7 +15,7 @@ const Navbar = () => {
   const { user, signOut } = useAuth();
 
   const links = [
-    { to: '/', label: 'Cookbook', icon: UtensilsCrossed },
+    { to: '/cookbook', label: 'Cookbook', icon: UtensilsCrossed },
     { to: '/meal-plan', label: 'Meal Plan', icon: CalendarDays },
     { to: '/favorites', label: 'Favorites', icon: Heart },
     { to: '/shopping-list', label: 'Shopping', icon: ShoppingCart },
