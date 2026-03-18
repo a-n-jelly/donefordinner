@@ -29,7 +29,7 @@ const Navbar = () => {
     <>
       {/* Desktop navbar */}
       <nav className="hidden md:flex items-center justify-between px-8 py-4 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/cookbook" className="flex items-center gap-2">
           <UtensilsCrossed className="h-6 w-6 text-primary" />
           <span className="font-heading text-xl font-bold text-foreground">Savory</span>
         </Link>
