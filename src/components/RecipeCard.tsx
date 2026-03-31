@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Clock, ChefHat, Star, Heart } from 'lucide-react';
+import { Clock, ChefHat, Star, Heart, Trash2 } from 'lucide-react';
 import { Recipe } from '@/types/recipe';
 import { motion } from 'framer-motion';
 
@@ -7,6 +7,7 @@ interface RecipeCardProps {
   recipe: Recipe;
   isFavorite: boolean;
   onToggleFavorite: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const difficultyColor: Record<string, string> = {
@@ -15,7 +16,7 @@ const difficultyColor: Record<string, string> = {
   Hard: 'bg-destructive/15 text-destructive',
 };
 
-const RecipeCard = ({ recipe, isFavorite, onToggleFavorite }: RecipeCardProps) => {
+const RecipeCard = ({ recipe, isFavorite, onToggleFavorite, onDelete }: RecipeCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -58,13 +59,24 @@ const RecipeCard = ({ recipe, isFavorite, onToggleFavorite }: RecipeCardProps) =
           </div>
         </div>
       </Link>
-      <button
-        onClick={(e) => { e.preventDefault(); onToggleFavorite(recipe.id); }}
-        className="absolute top-3 right-3 p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors"
-        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-      >
-        <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-secondary text-secondary' : 'text-muted-foreground'}`} />
-      </button>
+      <div className="absolute top-3 right-3 flex gap-1.5">
+        {onDelete && (
+          <button
+            onClick={(e) => { e.preventDefault(); onDelete(recipe.id); }}
+            className="p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-destructive/20 transition-colors"
+            aria-label="Delete recipe"
+          >
+            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.preventDefault(); onToggleFavorite(recipe.id); }}
+          className="p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors"
+          aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-secondary text-secondary' : 'text-muted-foreground'}`} />
+        </button>
+      </div>
     </motion.div>
   );
 };

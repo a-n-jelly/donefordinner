@@ -4,11 +4,15 @@ import RecipeCard from '@/components/RecipeCard';
 import SearchAndFilter from '@/components/SearchAndFilter';
 import AddRecipeDialog from '@/components/AddRecipeDialog';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { MealType, CuisineType, DietaryTag, Difficulty } from '@/types/recipe';
 import { ChefHat, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const Index = () => {
+  const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { dbRecipes, loading, refetch } = useDbRecipes();
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,6 +35,17 @@ const Index = () => {
       return true;
     });
   }, [dbRecipes, searchQuery, selectedCategory, selectedCuisine, selectedDietary, selectedDifficulty]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this recipe from your cookbook?')) return;
+    const { error } = await supabase.from('recipes').delete().eq('id', id);
+    if (error) {
+      toast.error('Failed to delete recipe');
+    } else {
+      toast.success('Recipe deleted');
+      refetch();
+    }
+  };
 
   return (
     <div className="min-h-screen pb-20 md:pb-0">
@@ -88,6 +103,7 @@ const Index = () => {
                 recipe={recipe}
                 isFavorite={isFavorite(recipe.id)}
                 onToggleFavorite={toggleFavorite}
+                onDelete={handleDelete}
               />
             ))}
           </div>
