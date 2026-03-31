@@ -36,6 +36,17 @@ const Index = () => {
     });
   }, [dbRecipes, searchQuery, selectedCategory, selectedCuisine, selectedDietary, selectedDifficulty]);
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this recipe from your cookbook?')) return;
+    const { error } = await supabase.from('recipes').delete().eq('id', id);
+    if (error) {
+      toast.error('Failed to delete recipe');
+    } else {
+      toast.success('Recipe deleted');
+      refetch();
+    }
+  };
+
   return (
     <div className="min-h-screen pb-20 md:pb-0">
       {/* Header */}
