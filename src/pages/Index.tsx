@@ -92,6 +92,7 @@ const Index = () => {
                 recipe={recipe}
                 isFavorite={isFavorite(recipe.id)}
                 onToggleFavorite={toggleFavorite}
+                onDelete={recipe.userId === user?.id ? handleDelete : undefined}
               />
             ))}
           </div>
