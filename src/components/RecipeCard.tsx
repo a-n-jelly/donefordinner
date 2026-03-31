@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Clock, ChefHat, Star, Heart } from 'lucide-react';
+import { Clock, ChefHat, Star, Heart, Trash2 } from 'lucide-react';
 import { Recipe } from '@/types/recipe';
 import { motion } from 'framer-motion';
 
@@ -7,6 +7,7 @@ interface RecipeCardProps {
   recipe: Recipe;
   isFavorite: boolean;
   onToggleFavorite: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const difficultyColor: Record<string, string> = {
