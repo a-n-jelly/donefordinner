@@ -59,13 +59,24 @@ const RecipeCard = ({ recipe, isFavorite, onToggleFavorite, onDelete }: RecipeCa
           </div>
         </div>
       </Link>
-      <button
-        onClick={(e) => { e.preventDefault(); onToggleFavorite(recipe.id); }}
-        className="absolute top-3 right-3 p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors"
-        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-      >
-        <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-secondary text-secondary' : 'text-muted-foreground'}`} />
-      </button>
+      <div className="absolute top-3 right-3 flex gap-1.5">
+        {onDelete && (
+          <button
+            onClick={(e) => { e.preventDefault(); onDelete(recipe.id); }}
+            className="p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-destructive/20 transition-colors"
+            aria-label="Delete recipe"
+          >
+            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.preventDefault(); onToggleFavorite(recipe.id); }}
+          className="p-2 rounded-full bg-card/80 backdrop-blur-sm hover:bg-card transition-colors"
+          aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Heart className={`h-4 w-4 transition-colors ${isFavorite ? 'fill-secondary text-secondary' : 'text-muted-foreground'}`} />
+        </button>
+      </div>
     </motion.div>
   );
 };
