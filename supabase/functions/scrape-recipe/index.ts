@@ -146,12 +146,12 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       console.error('Firecrawl API error:', data);
+      const msg = typeof data.error === 'string' && data.error.includes('do not support this site')
+        ? 'This website is not supported for scraping. Try a different recipe URL or add the recipe manually.'
+        : (data.error || `Failed to scrape recipe (${response.status})`);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: data.error || `Failed to scrape recipe (${response.status})` 
-        }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: msg }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
