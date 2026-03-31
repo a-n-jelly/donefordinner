@@ -16,7 +16,7 @@ const difficultyColor: Record<string, string> = {
   Hard: 'bg-destructive/15 text-destructive',
 };
 
-const RecipeCard = ({ recipe, isFavorite, onToggleFavorite }: RecipeCardProps) => {
+const RecipeCard = ({ recipe, isFavorite, onToggleFavorite, onDelete }: RecipeCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
