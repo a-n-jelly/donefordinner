@@ -4,11 +4,15 @@ import RecipeCard from '@/components/RecipeCard';
 import SearchAndFilter from '@/components/SearchAndFilter';
 import AddRecipeDialog from '@/components/AddRecipeDialog';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { MealType, CuisineType, DietaryTag, Difficulty } from '@/types/recipe';
 import { ChefHat, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const Index = () => {
+  const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { dbRecipes, loading, refetch } = useDbRecipes();
   const [searchQuery, setSearchQuery] = useState('');
