@@ -92,8 +92,8 @@ const AddRecipeDialog = ({ open, onOpenChange, onRecipeAdded }: AddRecipeDialogP
     
     try {
       const { error } = await supabase.from('recipes').insert({
-        user_id: user.id,
         ...recipe,
+        user_id: user.id,
       });
       
       if (error) throw error;
