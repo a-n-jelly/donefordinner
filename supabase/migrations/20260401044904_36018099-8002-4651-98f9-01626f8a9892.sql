@@ -1,0 +1,1 @@
+ALTER TABLE meal_plans ADD COLUMN day_notes jsonb DEFAULT '{}'::jsonb;

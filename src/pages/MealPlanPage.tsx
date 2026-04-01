@@ -13,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, ShoppingCart, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, ShoppingCart, Sparkles, Loader2, GripVertical, StickyNote } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DEFAULT_MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
@@ -26,7 +28,7 @@ const MealPlanPage = () => {
   const { user } = useAuth();
   const {
     mealPlan, loading, currentWeekStart, nextWeek, prevWeek, goToWeek,
-    addMeal, removeMeal, updateMeal, getMealsForShopping
+    addMeal, removeMeal, updateMeal, getMealsForShopping, updateDayNote, moveMeal
   } = useMealPlan();
   const { dbRecipes } = useDbRecipes();
   const { addItems } = useShoppingList();
@@ -42,6 +44,10 @@ const MealPlanPage = () => {
 
   const [prepSuggestions, setPrepSuggestions] = useState<string | null>(null);
   const [loadingPrep, setLoadingPrep] = useState(false);
+
+  // Day notes local state for editing
+  const [editingNoteDay, setEditingNoteDay] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState('');
 
   const openAddDialog = (dayOfWeek: number) => {
     setSelectedDay(dayOfWeek);
@@ -94,7 +100,6 @@ const MealPlanPage = () => {
       return;
     }
 
-    // Fetch full recipe details for each meal
     const recipeIds = [...new Set(meals.map(m => m.recipeId).filter(Boolean))] as string[];
     const { data: recipes } = await supabase
       .from('recipes')
@@ -106,7 +111,6 @@ const MealPlanPage = () => {
       return;
     }
 
-    // Aggregate ingredients, scaling by servings
     const ingredientMap = new Map<string, { amount: number; unit: string; recipeTitle: string }>();
 
     for (const meal of meals) {
@@ -129,11 +133,7 @@ const MealPlanPage = () => {
         if (existing) {
           existing.amount += amount;
         } else {
-          ingredientMap.set(key, {
-            amount,
-            unit,
-            recipeTitle: recipe.title,
-          });
+          ingredientMap.set(key, { amount, unit, recipeTitle: recipe.title });
         }
       }
     }
@@ -179,12 +179,32 @@ const MealPlanPage = () => {
     }
   };
 
-  // Group items by day
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const sourceDay = parseInt(result.source.droppableId);
+    const destDay = parseInt(result.destination.droppableId);
+    if (sourceDay === destDay) return;
+
+    const itemId = result.draggableId;
+    const { error } = await moveMeal(itemId, destDay);
+    if (error) toast.error('Failed to move meal');
+  };
+
+  const startEditingNote = (dayIndex: number) => {
+    setEditingNoteDay(dayIndex);
+    setNoteText(mealPlan?.dayNotes?.[String(dayIndex)] || '');
+  };
+
+  const saveNote = async () => {
+    if (editingNoteDay === null) return;
+    await updateDayNote(editingNoteDay, noteText);
+    setEditingNoteDay(null);
+  };
+
   const itemsByDay = DAYS.map((_, dayIndex) =>
     mealPlan?.items.filter(item => item.dayOfWeek === dayIndex) || []
   );
 
-  // Get non-leftover meals for leftover source selection
   const nonLeftoverMeals = mealPlan?.items.filter(i => !i.isLeftover && i.recipeId) || [];
 
   if (!user) {
@@ -206,7 +226,7 @@ const MealPlanPage = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="font-heading text-3xl font-bold">Meal Plan</h1>
-            <p className="text-muted-foreground">Plan your week's meals</p>
+            <p className="text-muted-foreground">Plan your week's meals — drag meals between days</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -274,55 +294,120 @@ const MealPlanPage = () => {
           </div>
         )}
 
-        {/* Week grid */}
+        {/* Week grid with DnD */}
         {!loading && (
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-            {DAYS.map((day, dayIndex) => (
-              <Card key={day} className="min-h-[200px]">
-                <CardHeader className="py-3 px-4">
-                  <CardTitle className="text-sm font-medium flex items-center justify-between">
-                    <span>{day}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {format(addDays(currentWeekStart, dayIndex), 'M/d')}
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-3 pb-3 space-y-2">
-                  {itemsByDay[dayIndex].map(item => (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "p-2 rounded-lg text-xs group relative",
-                        item.isLeftover ? "bg-muted/50 border border-dashed border-muted-foreground/30" : "bg-accent"
-                      )}
-                    >
-                      <div className="font-medium text-muted-foreground mb-0.5">{item.mealLabel}</div>
-                      <div className="font-medium line-clamp-2">
-                        {item.recipeTitle || 'Unknown recipe'}
-                        {item.isLeftover && <span className="text-muted-foreground ml-1">(leftover)</span>}
-                      </div>
-                      <div className="text-muted-foreground">{item.servings} servings</div>
-                      <button
-                        onClick={() => handleRemoveMeal(item.id)}
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+              {DAYS.map((day, dayIndex) => {
+                const dayNote = mealPlan?.dayNotes?.[String(dayIndex)] || '';
+                return (
+                  <Droppable droppableId={String(dayIndex)} key={day}>
+                    {(provided, snapshot) => (
+                      <Card
+                        className={cn(
+                          "min-h-[200px] transition-colors",
+                          snapshot.isDraggingOver && "ring-2 ring-primary/40 bg-primary/5"
+                        )}
                       >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </button>
-                    </div>
-                  ))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full h-8 text-xs"
-                    onClick={() => openAddDialog(dayIndex)}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add meal
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                        <CardHeader className="py-3 px-4">
+                          <CardTitle className="text-sm font-medium flex items-center justify-between">
+                            <span>{day}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(addDays(currentWeekStart, dayIndex), 'M/d')}
+                            </span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-3 pb-3 space-y-2">
+                          {/* Day note */}
+                          {editingNoteDay === dayIndex ? (
+                            <Textarea
+                              className="text-xs min-h-[48px] resize-none"
+                              placeholder="Add a note for this day..."
+                              value={noteText}
+                              onChange={e => setNoteText(e.target.value)}
+                              onBlur={saveNote}
+                              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveNote(); } }}
+                              autoFocus
+                            />
+                          ) : (
+                            <button
+                              onClick={() => startEditingNote(dayIndex)}
+                              className={cn(
+                                "w-full text-left text-xs rounded-md p-2 transition-colors",
+                                dayNote
+                                  ? "bg-accent/60 text-foreground"
+                                  : "text-muted-foreground hover:bg-muted/50"
+                              )}
+                            >
+                              <StickyNote className="h-3 w-3 inline mr-1 opacity-60" />
+                              {dayNote || 'Add note...'}
+                            </button>
+                          )}
+
+                          {/* Meals */}
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="space-y-2 min-h-[40px]"
+                          >
+                            {itemsByDay[dayIndex].map((item, index) => (
+                              <Draggable key={item.id} draggableId={item.id} index={index}>
+                                {(dragProvided, dragSnapshot) => (
+                                  <div
+                                    ref={dragProvided.innerRef}
+                                    {...dragProvided.draggableProps}
+                                    className={cn(
+                                      "p-2 rounded-lg text-xs group relative",
+                                      item.isLeftover ? "bg-muted/50 border border-dashed border-muted-foreground/30" : "bg-accent",
+                                      dragSnapshot.isDragging && "shadow-lg ring-2 ring-primary/30"
+                                    )}
+                                  >
+                                    <div className="flex items-start gap-1">
+                                      <div
+                                        {...dragProvided.dragHandleProps}
+                                        className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <GripVertical className="h-3 w-3" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-medium text-muted-foreground mb-0.5">{item.mealLabel}</div>
+                                        <div className="font-medium line-clamp-2">
+                                          {item.recipeTitle || 'Unknown recipe'}
+                                          {item.isLeftover && <span className="text-muted-foreground ml-1">(leftover)</span>}
+                                        </div>
+                                        <div className="text-muted-foreground">{item.servings} servings</div>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRemoveMeal(item.id)}
+                                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </button>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full h-8 text-xs"
+                            onClick={() => openAddDialog(dayIndex)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add meal
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </Droppable>
+                );
+              })}
+            </div>
+          </DragDropContext>
         )}
       </div>
 
