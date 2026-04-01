@@ -20,6 +20,7 @@ export interface MealPlan {
   id: string;
   weekStartDate: string;
   items: MealPlanItem[];
+  dayNotes: Record<string, string>;
 }
 
 export function useMealPlan() {
