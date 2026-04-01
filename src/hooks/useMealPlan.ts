@@ -76,6 +76,7 @@ export function useMealPlan() {
       setMealPlan({
         id: plan.id,
         weekStartDate: plan.week_start_date,
+        dayNotes: (plan as any).day_notes || {},
         items: (items || []).map((item: any) => ({
           id: item.id,
           recipeId: item.recipe_id,
