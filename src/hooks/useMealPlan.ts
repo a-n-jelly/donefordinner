@@ -194,6 +194,38 @@ export function useMealPlan() {
     return mealPlan.items.filter(item => !item.isLeftover && item.recipeId);
   }, [mealPlan]);
 
+  const updateDayNote = useCallback(async (dayOfWeek: number, note: string) => {
+    if (!mealPlan) return;
+    const updatedNotes = { ...mealPlan.dayNotes, [String(dayOfWeek)]: note };
+    // Remove empty notes
+    if (!note.trim()) delete updatedNotes[String(dayOfWeek)];
+
+    const { error } = await supabase
+      .from('meal_plans')
+      .update({ day_notes: updatedNotes } as any)
+      .eq('id', mealPlan.id);
+
+    if (!error) {
+      setMealPlan(prev => prev ? { ...prev, dayNotes: updatedNotes } : null);
+    }
+    return { error };
+  }, [mealPlan]);
+
+  const moveMeal = useCallback(async (itemId: string, newDayOfWeek: number) => {
+    const { error } = await supabase
+      .from('meal_plan_items')
+      .update({ day_of_week: newDayOfWeek })
+      .eq('id', itemId);
+
+    if (!error) {
+      setMealPlan(prev => prev ? {
+        ...prev,
+        items: prev.items.map(i => i.id === itemId ? { ...i, dayOfWeek: newDayOfWeek } : i),
+      } : null);
+    }
+    return { error };
+  }, []);
+
   return {
     mealPlan,
     loading,
@@ -205,6 +237,8 @@ export function useMealPlan() {
     addMeal,
     removeMeal,
     updateMeal,
+    updateDayNote,
+    moveMeal,
     getMealsForShopping,
     refetch: fetchMealPlan,
   };
