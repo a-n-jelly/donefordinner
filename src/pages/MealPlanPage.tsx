@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { format, addDays } from 'date-fns';
-import { useMealPlan, MealPlanItem } from '@/hooks/useMealPlan';
+import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, getDay } from 'date-fns';
+import { useMealPlan, MealPlanItem, DayTag } from '@/hooks/useMealPlan';
 import { useDbRecipes } from '@/hooks/useDbRecipes';
 import { useShoppingList } from '@/hooks/useShoppingList';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,8 +14,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, ShoppingCart, Sparkles, Loader2, GripVertical, StickyNote } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, ShoppingCart,
+  Sparkles, Loader2, GripVertical, StickyNote, Tag, UtensilsCrossed,
+  CalendarDays, LayoutGrid
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,15 +30,19 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DEFAULT_MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 
+type ViewMode = 'week' | 'month';
+
 const MealPlanPage = () => {
   const { user } = useAuth();
   const {
     mealPlan, loading, currentWeekStart, nextWeek, prevWeek, goToWeek,
-    addMeal, removeMeal, updateMeal, getMealsForShopping, updateDayNote, moveMeal
+    addMeal, removeMeal, updateMeal, getMealsForShopping, updateDayNote,
+    updateDayTag, moveMeal, getUpcomingMealsForPrep
   } = useMealPlan();
   const { dbRecipes } = useDbRecipes();
   const { addItems } = useShoppingList();
 
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedMealLabel, setSelectedMealLabel] = useState('Lunch');
@@ -45,7 +55,6 @@ const MealPlanPage = () => {
   const [prepSuggestions, setPrepSuggestions] = useState<string | null>(null);
   const [loadingPrep, setLoadingPrep] = useState(false);
 
-  // Day notes local state for editing
   const [editingNoteDay, setEditingNoteDay] = useState<number | null>(null);
   const [noteText, setNoteText] = useState('');
 
@@ -72,12 +81,8 @@ const MealPlanPage = () => {
     }
 
     const { error } = await addMeal(
-      selectedRecipeId,
-      selectedDay,
-      label.trim(),
-      servings,
-      isLeftover,
-      isLeftover ? leftoverSourceId || null : null
+      selectedRecipeId, selectedDay, label.trim(), servings,
+      isLeftover, isLeftover ? leftoverSourceId || null : null
     );
 
     if (error) {
@@ -116,20 +121,16 @@ const MealPlanPage = () => {
     for (const meal of meals) {
       const recipe = recipes.find(r => r.id === meal.recipeId);
       if (!recipe) continue;
-      
       const ingredients = recipe.ingredients as Array<{ name?: string; item?: string; amount?: string | number; unit?: string }> | null;
       if (!Array.isArray(ingredients)) continue;
-
       const recipeServings = recipe.servings || 4;
       const scale = meal.servings / recipeServings;
-
       for (const ing of ingredients) {
         const itemName = ing.name || ing.item || '';
         const unit = ing.unit || '';
         const key = `${itemName}-${unit}`.toLowerCase();
         const existing = ingredientMap.get(key);
         const amount = (parseFloat(String(ing.amount)) || 0) * scale;
-
         if (existing) {
           existing.amount += amount;
         } else {
@@ -201,11 +202,34 @@ const MealPlanPage = () => {
     setEditingNoteDay(null);
   };
 
+  const handleTagChange = async (dayIndex: number, tag: DayTag) => {
+    const currentTag = mealPlan?.dayTags?.[String(dayIndex)] || null;
+    const newTag = currentTag === tag ? null : tag;
+    await updateDayTag(dayIndex, newTag);
+  };
+
   const itemsByDay = DAYS.map((_, dayIndex) =>
     mealPlan?.items.filter(item => item.dayOfWeek === dayIndex) || []
   );
 
   const nonLeftoverMeals = mealPlan?.items.filter(i => !i.isLeftover && i.recipeId) || [];
+
+  // Monthly view helpers
+  const monthDate = currentWeekStart;
+  const monthStart = startOfMonth(monthDate);
+  const monthEnd = endOfMonth(monthDate);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+  const getMonthDays = () => {
+    const days: Date[] = [];
+    let d = calendarStart;
+    while (d <= calendarEnd) {
+      days.push(d);
+      d = addDays(d, 1);
+    }
+    return days;
+  };
 
   if (!user) {
     return (
@@ -219,6 +243,74 @@ const MealPlanPage = () => {
     );
   }
 
+  const DayTagBadge = ({ dayIndex }: { dayIndex: number }) => {
+    const tag = mealPlan?.dayTags?.[String(dayIndex)] || null;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="p-0.5 rounded hover:bg-muted/50 transition-colors">
+            {tag === 'shopping' ? (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 gap-0.5">
+                <ShoppingCart className="h-2.5 w-2.5" /> Shop
+              </Badge>
+            ) : tag === 'prep' ? (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 gap-0.5">
+                <UtensilsCrossed className="h-2.5 w-2.5" /> Prep
+              </Badge>
+            ) : (
+              <Tag className="h-3.5 w-3.5 text-muted-foreground/50" />
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[140px]">
+          <DropdownMenuItem onClick={() => handleTagChange(dayIndex, 'shopping')}>
+            <ShoppingCart className="h-3.5 w-3.5 mr-2 text-blue-600" />
+            Shopping Day
+            {tag === 'shopping' && <span className="ml-auto text-xs">✓</span>}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleTagChange(dayIndex, 'prep')}>
+            <UtensilsCrossed className="h-3.5 w-3.5 mr-2 text-amber-600" />
+            Prep Day
+            {tag === 'prep' && <span className="ml-auto text-xs">✓</span>}
+          </DropdownMenuItem>
+          {tag && (
+            <DropdownMenuItem onClick={() => handleTagChange(dayIndex, tag)}>
+              <Trash2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+              Clear Tag
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const PrepHighlight = ({ dayIndex }: { dayIndex: number }) => {
+    const tag = mealPlan?.dayTags?.[String(dayIndex)] || null;
+    if (tag !== 'prep') return null;
+    const upcoming = getUpcomingMealsForPrep(dayIndex);
+    if (upcoming.length === 0) return null;
+
+    return (
+      <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-2 text-xs space-y-1">
+        <div className="font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1">
+          <UtensilsCrossed className="h-3 w-3" /> Prep these ahead:
+        </div>
+        {upcoming.map(meal => (
+          <div key={meal.id} className="text-foreground/80 pl-4">
+            • {meal.recipeTitle} <span className="text-muted-foreground">({DAYS[meal.dayOfWeek]})</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const getDayCardClasses = (dayIndex: number) => {
+    const tag = mealPlan?.dayTags?.[String(dayIndex)] || null;
+    if (tag === 'shopping') return 'border-blue-500/30 bg-blue-500/5';
+    if (tag === 'prep') return 'border-amber-500/30 bg-amber-500/5';
+    return '';
+  };
+
   return (
     <div className="min-h-screen pb-20 md:pb-0">
       <div className="container max-w-7xl mx-auto px-4 py-8">
@@ -226,10 +318,32 @@ const MealPlanPage = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="font-heading text-3xl font-bold">Meal Plan</h1>
-            <p className="text-muted-foreground">Plan your week's meals — drag meals between days</p>
+            <p className="text-muted-foreground">Plan your meals — drag between days, tag shopping & prep days</p>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex items-center bg-muted rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('week')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+                  viewMode === 'week' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <CalendarDays className="h-3.5 w-3.5" /> Week
+              </button>
+              <button
+                onClick={() => setViewMode('month')}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5",
+                  viewMode === 'month' ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Month
+              </button>
+            </div>
+
             <Button variant="outline" size="icon" onClick={prevWeek}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -238,7 +352,10 @@ const MealPlanPage = () => {
               <PopoverTrigger asChild>
                 <Button variant="outline" className="min-w-[200px]">
                   <CalendarIcon className="h-4 w-4 mr-2" />
-                  {format(currentWeekStart, 'MMM d')} - {format(addDays(currentWeekStart, 6), 'MMM d, yyyy')}
+                  {viewMode === 'week'
+                    ? `${format(currentWeekStart, 'MMM d')} - ${format(addDays(currentWeekStart, 6), 'MMM d, yyyy')}`
+                    : format(currentWeekStart, 'MMMM yyyy')
+                  }
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -294,8 +411,8 @@ const MealPlanPage = () => {
           </div>
         )}
 
-        {/* Week grid with DnD */}
-        {!loading && (
+        {/* WEEK VIEW */}
+        {!loading && viewMode === 'week' && (
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
               {DAYS.map((day, dayIndex) => {
@@ -306,18 +423,25 @@ const MealPlanPage = () => {
                       <Card
                         className={cn(
                           "min-h-[200px] transition-colors",
-                          snapshot.isDraggingOver && "ring-2 ring-primary/40 bg-primary/5"
+                          snapshot.isDraggingOver && "ring-2 ring-primary/40 bg-primary/5",
+                          getDayCardClasses(dayIndex)
                         )}
                       >
                         <CardHeader className="py-3 px-4">
                           <CardTitle className="text-sm font-medium flex items-center justify-between">
-                            <span>{day}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span>{day}</span>
+                              <DayTagBadge dayIndex={dayIndex} />
+                            </div>
                             <span className="text-xs text-muted-foreground">
                               {format(addDays(currentWeekStart, dayIndex), 'M/d')}
                             </span>
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="px-3 pb-3 space-y-2">
+                          {/* Prep highlight */}
+                          <PrepHighlight dayIndex={dayIndex} />
+
                           {/* Day note */}
                           {editingNoteDay === dayIndex ? (
                             <Textarea
@@ -334,9 +458,7 @@ const MealPlanPage = () => {
                               onClick={() => startEditingNote(dayIndex)}
                               className={cn(
                                 "w-full text-left text-xs rounded-md p-2 transition-colors",
-                                dayNote
-                                  ? "bg-accent/60 text-foreground"
-                                  : "text-muted-foreground hover:bg-muted/50"
+                                dayNote ? "bg-accent/60 text-foreground" : "text-muted-foreground hover:bg-muted/50"
                               )}
                             >
                               <StickyNote className="h-3 w-3 inline mr-1 opacity-60" />
@@ -408,6 +530,70 @@ const MealPlanPage = () => {
               })}
             </div>
           </DragDropContext>
+        )}
+
+        {/* MONTH VIEW */}
+        {!loading && viewMode === 'month' && (
+          <div>
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-1 mb-1">
+              {DAYS.map(d => (
+                <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
+              ))}
+            </div>
+
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {getMonthDays().map((date, i) => {
+                const isCurrentMonth = isSameMonth(date, monthDate);
+                const isToday = isSameDay(date, new Date());
+
+                // Check if this date falls in the current week to show tags/meals
+                const dayOfWeekIndex = (getDay(date) + 6) % 7; // Convert Sun=0 to Mon=0
+                const isCurrentWeek = isSameDay(startOfWeek(date, { weekStartsOn: 1 }), currentWeekStart);
+                const dayItems = isCurrentWeek ? itemsByDay[dayOfWeekIndex] : [];
+                const dayTag = isCurrentWeek ? (mealPlan?.dayTags?.[String(dayOfWeekIndex)] || null) : null;
+
+                return (
+                  <button
+                    key={i}
+                    onClick={() => goToWeek(date)}
+                    className={cn(
+                      "min-h-[90px] p-1.5 rounded-lg border text-left transition-colors hover:bg-accent/50",
+                      isCurrentMonth ? "border-border" : "border-transparent opacity-40",
+                      isToday && "ring-2 ring-primary/40",
+                      isCurrentWeek && "bg-accent/30",
+                      dayTag === 'shopping' && isCurrentWeek && "border-blue-500/30 bg-blue-500/5",
+                      dayTag === 'prep' && isCurrentWeek && "border-amber-500/30 bg-amber-500/5",
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={cn(
+                        "text-xs font-medium",
+                        isToday ? "bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center" : ""
+                      )}>
+                        {format(date, 'd')}
+                      </span>
+                      {dayTag === 'shopping' && (
+                        <ShoppingCart className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                      )}
+                      {dayTag === 'prep' && (
+                        <UtensilsCrossed className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                      )}
+                    </div>
+                    {dayItems.slice(0, 3).map(item => (
+                      <div key={item.id} className="text-[10px] leading-tight truncate text-foreground/70 mb-0.5">
+                        {item.recipeTitle || item.mealLabel}
+                      </div>
+                    ))}
+                    {dayItems.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground">+{dayItems.length - 3} more</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
 

@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { startOfWeek, format, addWeeks, subWeeks } from 'date-fns';
 
+export type DayTag = 'shopping' | 'prep' | null;
+
 export interface MealPlanItem {
   id: string;
   recipeId: string | null;
@@ -21,19 +23,19 @@ export interface MealPlan {
   weekStartDate: string;
   items: MealPlanItem[];
   dayNotes: Record<string, string>;
+  dayTags: Record<string, DayTag>;
 }
 
 export function useMealPlan() {
   const { user } = useAuth();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
-    startOfWeek(new Date(), { weekStartsOn: 1 }) // Monday
+    startOfWeek(new Date(), { weekStartsOn: 1 })
   );
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null);
   const [loading, setLoading] = useState(true);
 
   const weekStartStr = format(currentWeekStart, 'yyyy-MM-dd');
 
-  // Fetch or create meal plan for current week
   const fetchMealPlan = useCallback(async () => {
     if (!user) {
       setMealPlan(null);
@@ -43,7 +45,6 @@ export function useMealPlan() {
 
     setLoading(true);
 
-    // Get or create meal plan for this week
     let { data: plan } = await supabase
       .from('meal_plans')
       .select('*')
@@ -52,7 +53,6 @@ export function useMealPlan() {
       .maybeSingle();
 
     if (!plan) {
-      // Create new meal plan for this week
       const { data: newPlan } = await supabase
         .from('meal_plans')
         .insert({ user_id: user.id, week_start_date: weekStartStr })
@@ -62,7 +62,6 @@ export function useMealPlan() {
     }
 
     if (plan) {
-      // Fetch items with recipe details
       const { data: items } = await supabase
         .from('meal_plan_items')
         .select(`
@@ -77,6 +76,7 @@ export function useMealPlan() {
         id: plan.id,
         weekStartDate: plan.week_start_date,
         dayNotes: (plan as any).day_notes || {},
+        dayTags: (plan as any).day_tags || {},
         items: (items || []).map((item: any) => ({
           id: item.id,
           recipeId: item.recipe_id,
@@ -188,7 +188,6 @@ export function useMealPlan() {
     return { error };
   }, []);
 
-  // Get all non-leftover meals for shopping list generation
   const getMealsForShopping = useCallback(() => {
     if (!mealPlan) return [];
     return mealPlan.items.filter(item => !item.isLeftover && item.recipeId);
@@ -197,7 +196,6 @@ export function useMealPlan() {
   const updateDayNote = useCallback(async (dayOfWeek: number, note: string) => {
     if (!mealPlan) return;
     const updatedNotes = { ...mealPlan.dayNotes, [String(dayOfWeek)]: note };
-    // Remove empty notes
     if (!note.trim()) delete updatedNotes[String(dayOfWeek)];
 
     const { error } = await supabase
@@ -209,6 +207,33 @@ export function useMealPlan() {
       setMealPlan(prev => prev ? { ...prev, dayNotes: updatedNotes } : null);
     }
     return { error };
+  }, [mealPlan]);
+
+  const updateDayTag = useCallback(async (dayOfWeek: number, tag: DayTag) => {
+    if (!mealPlan) return;
+    const updatedTags = { ...mealPlan.dayTags };
+    if (tag) {
+      updatedTags[String(dayOfWeek)] = tag;
+    } else {
+      delete updatedTags[String(dayOfWeek)];
+    }
+
+    const { error } = await supabase
+      .from('meal_plans')
+      .update({ day_tags: updatedTags } as any)
+      .eq('id', mealPlan.id);
+
+    if (!error) {
+      setMealPlan(prev => prev ? { ...prev, dayTags: updatedTags } : null);
+    }
+    return { error };
+  }, [mealPlan]);
+
+  const getUpcomingMealsForPrep = useCallback((prepDayIndex: number) => {
+    if (!mealPlan) return [];
+    return mealPlan.items.filter(
+      item => item.dayOfWeek > prepDayIndex && !item.isLeftover && item.recipeId
+    );
   }, [mealPlan]);
 
   const moveMeal = useCallback(async (itemId: string, newDayOfWeek: number) => {
@@ -238,8 +263,10 @@ export function useMealPlan() {
     removeMeal,
     updateMeal,
     updateDayNote,
+    updateDayTag,
     moveMeal,
     getMealsForShopping,
+    getUpcomingMealsForPrep,
     refetch: fetchMealPlan,
   };
 }
