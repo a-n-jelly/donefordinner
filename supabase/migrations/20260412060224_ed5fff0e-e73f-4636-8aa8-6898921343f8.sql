@@ -1,0 +1,1 @@
+ALTER TABLE public.meal_plans ADD COLUMN day_tags jsonb DEFAULT '{}'::jsonb;
