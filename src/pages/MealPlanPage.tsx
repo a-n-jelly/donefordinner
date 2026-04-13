@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, getDay } from 'date-fns';
 import { useMealPlan, MealPlanItem, DayTag } from '@/hooks/useMealPlan';
 import { useDbRecipes } from '@/hooks/useDbRecipes';
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import {
   ChevronLeft, ChevronRight, Plus, Trash2, CalendarIcon, ShoppingCart,
   Sparkles, Loader2, GripVertical, StickyNote, Tag, UtensilsCrossed,
-  CalendarDays, LayoutGrid
+  CalendarDays, LayoutGrid, Pencil
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -29,6 +29,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DEFAULT_MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const THEME_PRESETS = ['Meatless Monday', 'Taco Tuesday', 'Wok Wednesday', 'Throwback Thursday', 'Pizza Friday', 'Slow-Cook Saturday', 'Roast Sunday'];
 
 type ViewMode = 'week' | 'month';
 
@@ -36,8 +37,10 @@ const MealPlanPage = () => {
   const { user } = useAuth();
   const {
     mealPlan, loading, currentWeekStart, nextWeek, prevWeek, goToWeek,
-    addMeal, removeMeal, updateMeal, getMealsForShopping, updateDayNote,
-    updateDayTag, moveMeal, getUpcomingMealsForPrep
+    addMeal, addMealToWeek, removeMeal, updateMeal, getMealsForShopping, updateDayNote,
+    updateDayTag, moveMeal, getUpcomingMealsForPrep, getLeftoverSourceDay,
+    fetchMonthPlans, monthItems, monthDayTags, loadingMonth,
+    dayThemes, updateDayTheme,
   } = useMealPlan();
   const { dbRecipes } = useDbRecipes();
   const { addItems } = useShoppingList();
@@ -50,7 +53,8 @@ const MealPlanPage = () => {
   const [selectedRecipeId, setSelectedRecipeId] = useState('');
   const [servings, setServings] = useState(2);
   const [isLeftover, setIsLeftover] = useState(false);
-  const [leftoverSourceId, setLeftoverSourceId] = useState('');
+  // For month-view inline add: which week to add to
+  const [addDialogWeekStart, setAddDialogWeekStart] = useState<string | null>(null);
 
   const [prepSuggestions, setPrepSuggestions] = useState<string | null>(null);
   const [loadingPrep, setLoadingPrep] = useState(false);
@@ -58,14 +62,24 @@ const MealPlanPage = () => {
   const [editingNoteDay, setEditingNoteDay] = useState<number | null>(null);
   const [noteText, setNoteText] = useState('');
 
-  const openAddDialog = (dayOfWeek: number) => {
+  const [editingThemeDay, setEditingThemeDay] = useState<number | null>(null);
+  const [themeText, setThemeText] = useState('');
+
+  // Fetch month data when in month view or when currentWeekStart changes
+  useEffect(() => {
+    if (viewMode === 'month') {
+      fetchMonthPlans(currentWeekStart);
+    }
+  }, [viewMode, currentWeekStart, fetchMonthPlans]);
+
+  const openAddDialog = (dayOfWeek: number, weekStart?: string) => {
     setSelectedDay(dayOfWeek);
     setSelectedMealLabel('Lunch');
     setCustomMealLabel('');
     setSelectedRecipeId('');
     setServings(2);
     setIsLeftover(false);
-    setLeftoverSourceId('');
+    setAddDialogWeekStart(weekStart || null);
     setAddDialogOpen(true);
   };
 
@@ -80,22 +94,34 @@ const MealPlanPage = () => {
       return;
     }
 
-    const { error } = await addMeal(
-      selectedRecipeId, selectedDay, label.trim(), servings,
-      isLeftover, isLeftover ? leftoverSourceId || null : null
-    );
+    let result;
+    if (addDialogWeekStart) {
+      // Month-view: add to a specific week
+      result = await addMealToWeek(
+        addDialogWeekStart, selectedRecipeId, selectedDay, label.trim(), servings, isLeftover
+      );
+    } else {
+      result = await addMeal(
+        selectedRecipeId, selectedDay, label.trim(), servings, isLeftover
+      );
+    }
 
-    if (error) {
+    if (result?.error) {
       toast.error('Failed to add meal');
     } else {
       toast.success('Meal added!');
       setAddDialogOpen(false);
+      // Refresh month data if in month view
+      if (viewMode === 'month') {
+        fetchMonthPlans(currentWeekStart);
+      }
     }
   };
 
   const handleRemoveMeal = async (itemId: string) => {
     const { error } = await removeMeal(itemId);
     if (error) toast.error('Failed to remove meal');
+    else if (viewMode === 'month') fetchMonthPlans(currentWeekStart);
   };
 
   const handleGenerateShoppingList = async () => {
@@ -208,11 +234,20 @@ const MealPlanPage = () => {
     await updateDayTag(dayIndex, newTag);
   };
 
+  const startEditingTheme = (dayIndex: number) => {
+    setEditingThemeDay(dayIndex);
+    setThemeText(dayThemes[String(dayIndex)] || '');
+  };
+
+  const saveTheme = async () => {
+    if (editingThemeDay === null) return;
+    await updateDayTheme(editingThemeDay, themeText);
+    setEditingThemeDay(null);
+  };
+
   const itemsByDay = DAYS.map((_, dayIndex) =>
     mealPlan?.items.filter(item => item.dayOfWeek === dayIndex) || []
   );
-
-  const nonLeftoverMeals = mealPlan?.items.filter(i => !i.isLeftover && i.recipeId) || [];
 
   // Monthly view helpers
   const monthDate = currentWeekStart;
@@ -230,6 +265,13 @@ const MealPlanPage = () => {
     }
     return days;
   };
+
+  // Group month items by date string
+  const monthItemsByDate = monthItems.reduce<Record<string, typeof monthItems>>((acc, item) => {
+    if (!acc[item.actualDate]) acc[item.actualDate] = [];
+    acc[item.actualDate].push(item);
+    return acc;
+  }, {});
 
   if (!user) {
     return (
@@ -309,6 +351,51 @@ const MealPlanPage = () => {
     if (tag === 'shopping') return 'border-blue-500/30 bg-blue-500/5';
     if (tag === 'prep') return 'border-amber-500/30 bg-amber-500/5';
     return '';
+  };
+
+  const DayThemeLabel = ({ dayIndex }: { dayIndex: number }) => {
+    const theme = dayThemes[String(dayIndex)];
+    if (editingThemeDay === dayIndex) {
+      return (
+        <div className="mt-1 space-y-1">
+          <Input
+            className="h-6 text-[10px] px-1.5"
+            placeholder="Theme name..."
+            value={themeText}
+            onChange={e => setThemeText(e.target.value)}
+            onBlur={saveTheme}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveTheme(); } }}
+            autoFocus
+          />
+          <div className="flex flex-wrap gap-1">
+            {THEME_PRESETS.filter(p => p.toLowerCase().includes(DAYS[dayIndex].toLowerCase().slice(0, 3)) || true).slice(0, 3).map(preset => (
+              <button
+                key={preset}
+                className="text-[9px] px-1 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground"
+                onMouseDown={e => { e.preventDefault(); setThemeText(preset); }}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <button
+        onClick={() => startEditingTheme(dayIndex)}
+        className="flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary transition-colors mt-0.5"
+      >
+        {theme ? (
+          <span className="italic">{theme}</span>
+        ) : (
+          <>
+            <Pencil className="h-2.5 w-2.5" />
+            <span>Theme</span>
+          </>
+        )}
+      </button>
+    );
   };
 
   return (
@@ -405,7 +492,7 @@ const MealPlanPage = () => {
         )}
 
         {/* Loading */}
-        {loading && (
+        {(loading || (viewMode === 'month' && loadingMonth)) && (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
@@ -437,6 +524,7 @@ const MealPlanPage = () => {
                               {format(addDays(currentWeekStart, dayIndex), 'M/d')}
                             </span>
                           </CardTitle>
+                          <DayThemeLabel dayIndex={dayIndex} />
                         </CardHeader>
                         <CardContent className="px-3 pb-3 space-y-2">
                           {/* Prep highlight */}
@@ -472,44 +560,51 @@ const MealPlanPage = () => {
                             {...provided.droppableProps}
                             className="space-y-2 min-h-[40px]"
                           >
-                            {itemsByDay[dayIndex].map((item, index) => (
-                              <Draggable key={item.id} draggableId={item.id} index={index}>
-                                {(dragProvided, dragSnapshot) => (
-                                  <div
-                                    ref={dragProvided.innerRef}
-                                    {...dragProvided.draggableProps}
-                                    className={cn(
-                                      "p-2 rounded-lg text-xs group relative",
-                                      item.isLeftover ? "bg-muted/50 border border-dashed border-muted-foreground/30" : "bg-accent",
-                                      dragSnapshot.isDragging && "shadow-lg ring-2 ring-primary/30"
-                                    )}
-                                  >
-                                    <div className="flex items-start gap-1">
-                                      <div
-                                        {...dragProvided.dragHandleProps}
-                                        className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <GripVertical className="h-3 w-3" />
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="font-medium text-muted-foreground mb-0.5">{item.mealLabel}</div>
-                                        <div className="font-medium line-clamp-2">
-                                          {item.recipeTitle || 'Unknown recipe'}
-                                          {item.isLeftover && <span className="text-muted-foreground ml-1">(leftover)</span>}
-                                        </div>
-                                        <div className="text-muted-foreground">{item.servings} servings</div>
-                                      </div>
-                                    </div>
-                                    <button
-                                      onClick={() => handleRemoveMeal(item.id)}
-                                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+                            {itemsByDay[dayIndex].map((item, index) => {
+                              const leftoverDay = getLeftoverSourceDay(item);
+                              return (
+                                <Draggable key={item.id} draggableId={item.id} index={index}>
+                                  {(dragProvided, dragSnapshot) => (
+                                    <div
+                                      ref={dragProvided.innerRef}
+                                      {...dragProvided.draggableProps}
+                                      className={cn(
+                                        "p-2 rounded-lg text-xs group relative",
+                                        item.isLeftover ? "bg-muted/50 border border-dashed border-muted-foreground/30" : "bg-accent",
+                                        dragSnapshot.isDragging && "shadow-lg ring-2 ring-primary/30"
+                                      )}
                                     >
-                                      <Trash2 className="h-3 w-3 text-destructive" />
-                                    </button>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
+                                      <div className="flex items-start gap-1">
+                                        <div
+                                          {...dragProvided.dragHandleProps}
+                                          className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                          <GripVertical className="h-3 w-3" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-medium text-muted-foreground mb-0.5">{item.mealLabel}</div>
+                                          <div className="font-medium line-clamp-2">
+                                            {item.recipeTitle || 'Unknown recipe'}
+                                          </div>
+                                          {item.isLeftover && (
+                                            <div className="text-muted-foreground italic">
+                                              leftover from {leftoverDay || 'earlier'}
+                                            </div>
+                                          )}
+                                          <div className="text-muted-foreground">{item.servings} servings</div>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => handleRemoveMeal(item.id)}
+                                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+                                      >
+                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              );
+                            })}
                             {provided.placeholder}
                           </div>
 
@@ -533,7 +628,7 @@ const MealPlanPage = () => {
         )}
 
         {/* MONTH VIEW */}
-        {!loading && viewMode === 'month' && (
+        {!loading && !loadingMonth && viewMode === 'month' && (
           <div>
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
@@ -545,26 +640,24 @@ const MealPlanPage = () => {
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
               {getMonthDays().map((date, i) => {
-                const isCurrentMonth = isSameMonth(date, monthDate);
+                const isCurrentMonth = isSameMonth(date, monthStart);
                 const isToday = isSameDay(date, new Date());
-
-                // Check if this date falls in the current week to show tags/meals
-                const dayOfWeekIndex = (getDay(date) + 6) % 7; // Convert Sun=0 to Mon=0
-                const isCurrentWeek = isSameDay(startOfWeek(date, { weekStartsOn: 1 }), currentWeekStart);
-                const dayItems = isCurrentWeek ? itemsByDay[dayOfWeekIndex] : [];
-                const dayTag = isCurrentWeek ? (mealPlan?.dayTags?.[String(dayOfWeekIndex)] || null) : null;
+                const dateStr = format(date, 'yyyy-MM-dd');
+                const dayOfWeekIndex = (getDay(date) + 6) % 7;
+                const dayItems = monthItemsByDate[dateStr] || [];
+                const dayTag = monthDayTags[dateStr] || null;
+                const weekStart = format(startOfWeek(date, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+                const theme = dayThemes[String(dayOfWeekIndex)];
 
                 return (
-                  <button
+                  <div
                     key={i}
-                    onClick={() => goToWeek(date)}
                     className={cn(
-                      "min-h-[90px] p-1.5 rounded-lg border text-left transition-colors hover:bg-accent/50",
+                      "min-h-[100px] p-1.5 rounded-lg border text-left transition-colors",
                       isCurrentMonth ? "border-border" : "border-transparent opacity-40",
                       isToday && "ring-2 ring-primary/40",
-                      isCurrentWeek && "bg-accent/30",
-                      dayTag === 'shopping' && isCurrentWeek && "border-blue-500/30 bg-blue-500/5",
-                      dayTag === 'prep' && isCurrentWeek && "border-amber-500/30 bg-amber-500/5",
+                      dayTag === 'shopping' && "border-blue-500/30 bg-blue-500/5",
+                      dayTag === 'prep' && "border-amber-500/30 bg-amber-500/5",
                     )}
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -574,22 +667,41 @@ const MealPlanPage = () => {
                       )}>
                         {format(date, 'd')}
                       </span>
-                      {dayTag === 'shopping' && (
-                        <ShoppingCart className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                      )}
-                      {dayTag === 'prep' && (
-                        <UtensilsCrossed className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                      )}
+                      <div className="flex items-center gap-0.5">
+                        {dayTag === 'shopping' && (
+                          <ShoppingCart className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                        )}
+                        {dayTag === 'prep' && (
+                          <UtensilsCrossed className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        )}
+                      </div>
                     </div>
+                    {theme && (
+                      <div className="text-[9px] italic text-primary/60 mb-0.5 truncate">{theme}</div>
+                    )}
                     {dayItems.slice(0, 3).map(item => (
-                      <div key={item.id} className="text-[10px] leading-tight truncate text-foreground/70 mb-0.5">
-                        {item.recipeTitle || item.mealLabel}
+                      <div key={item.id} className="text-[10px] leading-tight truncate text-foreground/70 mb-0.5 group/item flex items-center gap-0.5">
+                        <span className="flex-1 truncate">{item.recipeTitle || item.mealLabel}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveMeal(item.id); }}
+                          className="opacity-0 group-hover/item:opacity-100 p-0 shrink-0"
+                        >
+                          <Trash2 className="h-2.5 w-2.5 text-destructive" />
+                        </button>
                       </div>
                     ))}
                     {dayItems.length > 3 && (
                       <div className="text-[10px] text-muted-foreground">+{dayItems.length - 3} more</div>
                     )}
-                  </button>
+                    {isCurrentMonth && (
+                      <button
+                        onClick={() => openAddDialog(dayOfWeekIndex, weekStart)}
+                        className="mt-0.5 w-full flex items-center justify-center text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded py-0.5 transition-colors"
+                      >
+                        <Plus className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -660,27 +772,9 @@ const MealPlanPage = () => {
                 onCheckedChange={(checked) => setIsLeftover(checked === true)}
               />
               <Label htmlFor="leftover" className="text-sm font-normal cursor-pointer">
-                This is a leftover from another meal
+                This is a leftover
               </Label>
             </div>
-
-            {isLeftover && nonLeftoverMeals.length > 0 && (
-              <div className="space-y-2">
-                <Label>Leftover from</Label>
-                <Select value={leftoverSourceId} onValueChange={setLeftoverSourceId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select source meal..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {nonLeftoverMeals.map(meal => (
-                      <SelectItem key={meal.id} value={meal.id}>
-                        {DAYS[meal.dayOfWeek]} {meal.mealLabel} - {meal.recipeTitle}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
           <DialogFooter>

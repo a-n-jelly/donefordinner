@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN day_themes jsonb DEFAULT '{}'::jsonb;
